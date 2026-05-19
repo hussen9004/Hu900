@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تتبع للأنظمة الأمنية - المتجر الذهبي</title>
+    <meta name="description" content="تتبع للأنظمة الأمنية - كاميرات مراقبة، شبكات، أقفال ذكية، استشارات فنية">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4a5568',
+                        primaryDark: '#2d3748',
+                        gold: '#d4af37',
+                        goldDark: '#b8960c',
+                        goldLight: '#f5e6a3',
+                        grayBg: '#f7f7f7'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap');
+        body { font-family: 'Tajawal', sans-serif; background-color: #f5f5f5; }
+        .modal { display: none; }
+        .modal.active { display: flex; }
+        .toast { position: fixed; bottom: 20px; left: 20px; z-index: 1000; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        #map { height: 250px; border-radius: 15px; z-index: 1; }
+        .gold-gradient { background: linear-gradient(135deg, #d4af37 0%, #b8960c 100%); }
+        .gray-gradient { background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%); }
+        .product-card { transition: all 0.3s ease; border: 1px solid #e5e5e5; }
+        .product-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(212, 175, 55, 0.2); border-color: #d4af37; }
+        .category-btn.active { background: linear-gradient(135deg, #d4af37 0%, #b8960c 100%); color: #2d3748; }
+        .category-btn { transition: all 0.3s ease; }
+        .gold-border { border-color: #d4af37; }
+        .floating-whatsapp { position: fixed; bottom: 20px; right: 20px; z-index: 100; background: linear-gradient(135deg, #25D366, #128C7E); }
+        .specs-item { background: #f8f8f8; border-right: 3px solid #d4af37; }
+    </style>
+</head>
+<body class="bg-grayBg">
+
+    <!-- شريط التواصل -->
+    <div class="bg-primaryDark text-white py-2 px-4 text-sm">
+        <div class="container mx-auto flex justify-between items-center flex-wrap">
+            <div class="flex items-center gap-4">
+                <a href="tel:966504330032" class="hover:text-gold transition"><i class="fas fa-phone ml-1"></i>966504330032</a>
+                <a href="mailto:info@trackingstore.sa" class="hover:text-gold transition"><i class="fas fa-envelope ml-1"></i>info@trackingstore.sa</a>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="showLoginModal()" class="bg-gold hover:bg-goldDark text-primaryDark px-3 py-1 rounded-full transition text-xs font-bold"><i class="fas fa-sign-in-alt ml-1"></i>دخول</button>
+                <button onclick="showRegisterModal()" class="bg-gold hover:bg-goldDark text-primaryDark px-3 py-1 rounded-full transition text-xs font-bold"><i class="fas fa-user-plus ml-1"></i>حساب جديد</button>
+                <button onclick="showAdminDashboard()" class="bg-primary hover:bg-primaryDark px-3 py-1 rounded-full transition text-xs"><i class="fas fa-chart-line ml-1"></i>لوحة المدير</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- الهيدر -->
+    <header class="bg-white sticky top-0 z-50 border-b border-gold shadow-md">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 gold-gradient rounded-xl flex items-center justify-center text-primaryDark text-xl shadow">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-primary">تتبع للأنظمة الأمنية</h1>
+                        <p class="text-xs text-goldDark">Tracking Store - الحلول المتكاملة</p>
+                    </div>
+                </div>
+                <button onclick="openCart()" class="relative">
+                    <i class="fas fa-shopping-cart text-xl text-primary"></i>
+                    <span id="cartCount" class="absolute -top-2 -right-2 bg-gold text-primaryDark text-xs w-5 h-5 rounded-full hidden items-center justify-center font-bold">0</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- الأقسام الرئيسية -->
+    <section class="container mx-auto px-4 py-6">
+        <div class="flex flex-wrap gap-2 justify-center mb-6" id="categoryButtons"></div>
+        
+        <!-- شبكة المنتجات -->
+        <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+    </section>
+
+    <!-- نافذة إدارة المنتجات (تعديل + إضافة + مواصفات + تعليمات) -->
+    <div id="productManagerModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden modal items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gold flex justify-between items-center sticky top-0 bg-white">
+                <h2 id="managerTitle" class="text-2xl font-bold text-primary"><i class="fas fa-edit ml-2 text-gold"></i>إدارة المنتجات</h2>
+                <button onclick="closeProductManager()" class="text-gray-500 hover:text-red-500 text-2xl">&times;</button>
+            </div>
+            <div class="p-6">
+                <form id="productForm" onsubmit="saveProduct(event)" class="space-y-4">
+                    <input type="hidden" id="productId">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-primary">اسم المنتج *</label>
+                            <input type="text" id="productName" required class="w-full p-3 rounded-lg border focus:border-gold focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-primary">القسم *</label>
+                            <select id="productCategory" required class="w-full p-3 rounded-lg border focus:border-gold focus:outline-none"></select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-primary">السعر (ريال) *</label>
+                            <input type="number" id="productPrice" required class="w-full p-3 rounded-lg border focus:border-gold focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-primary">سعر التقسيط (شهرياً)</label>
+                            <input type="number" id="productInstallment" class="w-full p-3 rounded-lg border focus:border-gold focus:outline-none">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium mb-1 text-primary">رابط الصورة</label>
+                            <input type="url" id="productImage" class="w-full p-3 rounded-lg border focus:border-gold focus:outline-none" placeholder="https://example.com/image.jpg">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-primary">الوصف</label>
+                        <textarea id="productDescription" rows="3" class="w-full p-3 rounded-lg border focus:border-gold focus:outline-none"></textarea>
+                    </div>
+                    
+                    <!-- المواصفات -->
+                    <div class="border-t border-gold pt-4">
+                        <label class="block text-sm font-medium mb-2 text-primary"><i class="fas fa-list ml-1 text-gold"></i>المواصفات</label>
+                        <div id="specsList" class="space-y-2 mb-3"></div>
+                        <div class="flex gap-2">
+                            <input type="text" id="specKey" placeholder="اسم المواصفة (مثال: الدقة)" class="flex-1 p-2 rounded-lg border text-sm focus:border-gold focus:outline-none">
+                            <input type="text" id="specValue" placeholder="القيمة (مثال: 4MP)" class="flex-1 p-2 rounded-lg border text-sm focus:border-gold focus:outline-none">
+                            <button type="button" onclick="addSpecification()" class="gold-gradient text-primaryDark px-4 rounded-lg font-bold">إضافة</button>
+                        </div>
+                    </div>
+                    
+                    <!-- تعليمات الاستخدام -->
+                    <div class="border-t border-gold pt-4">
+                        <label class="block text-sm font-medium mb-2 text-primary"><i class="fas fa-clipboard-list ml-1 text-gold"></i>تعليمات الاستخدام</label>
+                        <div id="instructionsList" class="space-y-2 mb-3"></div>
+                        <div class="flex gap-2">
+                            <input type="text" id="instructionText" placeholder="أدخل تعليمة جديدة" class="flex-1 p-2 rounded-lg border text-sm focus:border-gold focus:outline-none">
+                            <button type="button" onclick="addInstruction()" class="gold-gradient text-primaryDark px-4 rounded-lg font-bold">إضافة</button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="submit" class="flex-1 gold-gradient text-primaryDark py-3 rounded-xl font-bold transition hover:opacity-90">
+                            <i class="fas fa-save ml-2"></i>حفظ المنتج
+                        </button>
+                        <button type="button" onclick="closeProductManager()" class="flex-1 bg-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-400 transition">
+                            إلغاء
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- قائمة منتجات القسم الحالي -->
+                <div class="mt-8 border-t border-gray-200 pt-6">
+                    <h3 class="font-bold text-lg mb-4 text-primary"><i class="fas fa-boxes ml-1 text-gold"></i>منتجات هذا القسم</h3>
+                    <div id="categoryProductsList" class="space-y-2 max-h-60 overflow-y-auto"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة عرض المنتج (مع المواصفات والتعليمات) -->
+    <div id="productViewModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden modal items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div class="relative">
+                <button onclick="closeProductView()" class="absolute top-4 left-4 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 z-10">&times;</button>
+                <div id="productViewContent" class="p-6"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة إدارة الأقسام -->
+    <div id="categoryManagerModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden modal items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg">
+            <div class="p-6 border-b border-gold flex justify-between">
+                <h2 class="text-2xl font-bold text-primary"><i class="fas fa-folder-open ml-2 text-gold"></i>إدارة الأقسام</h2>
+                <button onclick="closeCategoryManager()" class="text-2xl">&times;</button>
+            </div>
+            <div class="p-6">
+                <div class="flex gap-2 mb-4">
+                    <input type="text" id="newCategoryName" placeholder="اسم القسم الجديد" class="flex-1 p-2 border rounded-lg focus:border-gold">
+                    <button onclick="addNewCategory()" class="gold-gradient text-primaryDark px-4 rounded-lg font-bold">إضافة</button>
+                </div>
+                <div id="categoriesList" class="space-y-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- باقي النوافذ (تسجيل دخول، حساب جديد، سلة، لوحة المدير، إلخ) -->
+    <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden modal items-center justify-center p-4">...</div>
+    <div id="registerModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden modal items-center justify-center p-4">...</div>
+    <div id="forgotPasswordModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden modal items-center justify-center p-4">...</div>
+    <div id="adminDashboard" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden modal items-center justify-center p-4">...</div>
+    <div id="cartModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden modal items-center justify-center p-4">...</div>
+
+    <!-- زر واتساب -->
+    <a href="https://wa.me/966504330032" target="_blank" class="floating-whatsapp text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg hover:scale-110 transition">
+        <i class="fab fa-whatsapp text-2xl"></i>
+    </a>
+
+    <script>
+        // ============ الأقسام (قابلة للتعديل) ============
+        let categories = [
+            { id: "cameras", name: "كاميرات مراقبة", icon: "fa-camera" },
+            { id: "ip_cameras", name: "كاميرات IP", icon: "fa-network-wired" },
+            { id: "nvr", name: "مسجلات NVR", icon: "fa-server" },
+            { id: "smartlocks", name: "أقفال ذكية", icon: "fa-lock" }
+        ];
+
+        // ============ المنتجات مع المواصفات والتعليمات ============
+        let products = [
+            { 
+                id: 1, name: "كاميرا IP 4MP ليلية", category: "ip_cameras", price: 450, installmentPrice: 112.5,
+                image: "https://images.unsplash.com/photo-1557324232-b8917d3c3dcb?w=400",
+                description: "كاميرا مراقبة احترافية بدقة 4MP مع رؤية ليلية حتى 30 متر ومقاومة للماء IP67",
+                specs: [
+                    { key: "الدقة", value: "4MP" },
+                    { key: "الرؤية الليلية", value: "30 متر" },
+                    { key: "مقاومة الماء", value: "IP67" },
+                    { key: "نوع العدسة", value: "2.8mm" }
+                ],
+                instructions: [
+                    "ثبت الكاميرا في مكان مرتفع للحصول على زاوية أفضل",
+                    "استخدم كابل Cat6 للحصول على أفضل أداء",
+                    "يمكنك ضبط الحساسية من خلال التطبيق"
+                ]
+            },
+            { 
+                id: 2, name: "مسجل NVR 16 قناة 4K", category: "nvr", price: 1200, installmentPrice: 300,
+                image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400",
+                description: "مسجل شبكي 16 قناة بدقة 4K مع دعم هارد ديسك حتى 8TB",
+                specs: [
+                    { key: "القنوات", value: "16 قناة" },
+                    { key: "الدقة القصوى", value: "4K" },
+                    { key: "التخزين", value: "حتى 8TB" },
+                    { key: "المنافذ", value: "HDMI, VGA, USB" }
+                ],
+                instructions: [
+                    "ثبت الهارد ديسك قبل التشغيل الأول",
+                    "وصل الجهاز بالراوتر عبر كابل الشبكة",
+                    "حمل تطبيق المراقبة لمشاهدة الكاميرات"
+                ]
+            },
+            { 
+                id: 3, name: "قفل ذكي ببصمة الإصبع", category: "smartlocks", price: 899, installmentPrice: 224.75,
+                image: "https://images.unsplash.com/photo-1558002038-1055907df827?w=400",
+                description: "قفل ذكي متعدد الفتحات (بصمة، رقم، بطاقة، مفتاح) مناسب للمنازل والشركات",
+                specs: [
+                    { key: "طرق الفتح", value: "بصمة - رقم - بطاقة - مفتاح" },
+                    { key: "سعة البصمات", value: "100 بصمة" },
+                    { key: "البطارية", value: "4 بطاريات AA" },
+                    { key: "مقاوم للماء", value: "نعم" }
+                ],
+                instructions: [
+                    "قم بتثبيت التطبيق على هاتفك",
+                    "سجل بصمة الإصبع الرئيسية أولاً",
+                    "يمكنك إضافة ما يصل إلى 100 بصمة مختلفة",
+                    "غير كلمة السر الافتراضية فور التركيب"
+                ]
+            }
+        ];
+
+        // بيانات إضافية
+        let customers = [];
+        let currentUser = null;
+        let technicians = [
+            { id: 1, name: "أحمد محمد", specialty: "كاميرات مراقبة", status: "online", phone: "966504330032", avatar: "https://randomuser.me/api/portraits/men/1.jpg" },
+            { id: 2, name: "خالد العتيبي", specialty: "شبكات وأقفال", status: "busy", phone: "966504330032", avatar: "https://randomuser.me/api/portraits/men/2.jpg" }
+        ];
+        let consultations = [];
+        let maintenanceRequests = [];
+        let orders = [];
+        let cart = [];
+        let currentCategory = "all";
+        let tempSpecs = [], tempInstructions = [];
+        let currentEditCategory = null;
+
+        // تحميل وحفظ البيانات
+        function loadData() {
+            const saved = localStorage.getItem('tracking_gold_data');
+            if (saved) {
+                const data = JSON.parse(saved);
+                categories = data.categories || categories;
+                products = data.products || products;
+                customers = data.customers || [];
+                consultations = data.consultations || [];
+                maintenanceRequests = data.maintenanceRequests || [];
+                orders = data.orders || [];
+                technicians = data.technicians || technicians;
+            }
+            const savedCart = localStorage.getItem('tracking_gold_cart');
+            if (savedCart) cart = JSON.parse(savedCart);
+            const savedUser = localStorage.getItem('tracking_gold_user');
+            if (savedUser) currentUser = JSON.parse(savedUser);
+        }
+
+        function saveData() {
+            localStorage.setItem('tracking_gold_data', JSON.stringify({
+                categories, products, customers, consultations, maintenanceRequests, orders, technicians
+            }));
+        }
+
+        function saveCart() { localStorage.setItem('tracking_gold_cart', JSON.stringify(cart)); }
+
+        // عرض الأقسام
+        function renderCategories() {
+            const container = document.getElementById('categoryButtons');
+            container.innerHTML = `
+                <button onclick="filterProducts('all')" class="category-btn px-5 py-2 rounded-full border-2 border-gold font-medium transition ${currentCategory === 'all' ? 'active text-primaryDark' : 'bg-white text-primary'}">
+                    <i class="fas fa-th-large ml-1"></i>الكل
+                </button>
+                ${categories.map(cat => `
+                    <button onclick="filterProducts('${cat.id}')" class="category-btn px-5 py-2 rounded-full border-2 border-gold font-medium transition ${currentCategory === cat.id ? 'active text-primaryDark' : 'bg-white text-primary'}">
+                        <i class="fas ${cat.icon} ml-1"></i>${cat.name}
+                        <button onclick="event.stopPropagation(); openCategoryProducts('${cat.id}')" class="mr-1 text-xs gold-gradient text-primaryDark px-2 py-0.5 rounded-full">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </button>
+                `).join('')}
+                <button onclick="openCategoryManager()" class="px-5 py-2 rounded-full border-2 border-primary bg-primary text-white font-medium transition">
+                    <i class="fas fa-plus ml-1"></i>قسم جديد
+                </button>
+            `;
+        }
+
+        // عرض المنتجات
+        function renderProducts() {
+            const filtered = currentCategory === 'all' ? products : products.filter(p => p.category === currentCategory);
+            const grid = document.getElementById('productsGrid');
+            
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <i class="fas fa-box-open text-6xl text-gray-300 mb-4"></i>
+                        <p class="text-xl text-gray-500">لا توجد منتجات في هذا القسم</p>
+                        <button onclick="openCategoryProducts('${currentCategory === 'all' ? categories[0]?.id : currentCategory}')" class="mt-4 gold-gradient text-primaryDark px-6 py-2 rounded-full font-bold">
+                            <i class="fas fa-plus ml-2"></i>أضف أول منتج
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(p => `
+                <div class="product-card bg-white rounded-2xl overflow-hidden shadow-md">
+                    <div class="relative h-48 overflow-hidden bg-gray-100">
+                        <img src="${p.image || 'https://via.placeholder.com/400x300?text=صورة+المنتج'}" class="w-full h-full object-cover hover:scale-110 transition duration-500">
+                        <span class="absolute top-3 right-3 gold-gradient text-primaryDark text-xs px-3 py-1 rounded-full font-bold">${categories.find(c => c.id === p.category)?.name || p.category}</span>
+                        ${p.installmentPrice ? `<span class="absolute top-3 left-3 bg-primary text-white text-xs px-3 py-1 rounded-full">تقسيط</span>` : ''}
+                        <div class="absolute bottom-3 left-3 flex gap-1">
+                            <button onclick="editProduct(${p.id})" class="bg-gold text-primaryDark p-2 rounded-full text-xs shadow-md hover:scale-110 transition">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteProduct(${p.id})" class="bg-red-500 text-white p-2 rounded-full text-xs shadow-md hover:scale-110 transition">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-5">
+                        <h3 class="font-bold text-lg mb-2 text-primary">${p.name}</h3>
+                        <p class="text-gray-500 text-sm mb-4 line-clamp-2">${p.description?.substring(0, 80) || ''}...</p>
+                        <div class="flex items-end justify-between mb-4">
+                            <div>
+                                <span class="text-2xl font-bold text-goldDark">${p.price} ريال</span>
+                                ${p.installmentPrice ? `<div class="text-sm text-gray-500">أو <span class="text-goldDark font-bold">${p.installmentPrice} ريال</span> × 4</div>` : ''}
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="viewProduct(${p.id})" class="flex-1 gold-gradient text-primaryDark py-2 rounded-xl transition font-bold">
+                                <i class="fas fa-eye ml-1"></i>عرض التفاصيل
+                            </button>
+                            <button onclick="addToCart(${p.id})" class="px-4 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600 transition">
+                                <i class="fas fa-cart-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterProducts(categoryId) {
+            currentCategory = categoryId;
+            renderCategories();
+            renderProducts();
+        }
+
+        // فتح إدارة منتجات قسم معين
+        function openCategoryProducts(categoryId) {
+            currentEditCategory = categoryId;
+            const category = categories.find(c => c.id === categoryId);
+            document.getElementById('managerTitle').innerHTML = `<i class="fas fa-folder-open ml-2 text-gold"></i>إدارة منتجات ${category?.name}`;
+            
+            const select = document.getElementById('productCategory');
+            select.innerHTML = categories.map(cat => `<option value="${cat.id}" ${cat.id === categoryId ? 'selected' : ''}>${cat.name}</option>`).join('');
+            
+            const categoryProducts = products.filter(p => p.category === categoryId);
+            const listDiv = document.getElementById('categoryProductsList');
+            if (categoryProducts.length === 0) {
+                listDiv.innerHTML = '<div class="text-center text-gray-500 py-4 bg-gray-50 rounded-lg">لا توجد منتجات في هذا القسم</div>';
+            } else {
+                listDiv.innerHTML = categoryProducts.map(p => `
+                    <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:shadow-md transition">
+                        <div class="flex items-center gap-3">
+                            <img src="${p.image || 'https://via.placeholder.com/50'}" class="w-12 h-12 object-cover rounded-lg">
+                            <div>
+                                <div class="font-bold text-primary">${p.name}</div>
+                                <div class="text-sm text-goldDark font-bold">${p.price} ريال</div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="editProduct(${p.id})" class="text-goldDark hover:text-gold"><i class="fas fa-edit"></i></button>
+                            <button onclick="deleteProduct(${p.id})" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            document.getElementById('productForm').reset();
+            document.getElementById('productId').value = '';
+            tempSpecs = [];
+            tempInstructions = [];
+            renderSpecsList();
+            renderInstructionsList();
+            document.getElementById('productManagerModal').classList.add('active');
+        }
+
+        // إدارة المواصفات
+        function addSpecification() {
+            const key = document.getElementById('specKey').value.trim();
+            const value = document.getElementById('specValue').value.trim();
+            if (!key || !value) { showToast('الرجاء إدخال المواصفة والقيمة', 'error'); return; }
+            tempSpecs.push({ key, value });
+            renderSpecsList();
+            document.getElementById('specKey').value = '';
+            document.getElementById('specValue').value = '';
+        }
+
+        function renderSpecsList() {
+            const container = document.getElementById('specsList');
+            container.innerHTML = tempSpecs.map((spec, i) => `
+                <div class="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
+                    <span><strong class="text-primary">${spec.key}:</strong> <span class="text-gray-600">${spec.value}</span></span>
+                    <button type="button" onclick="tempSpecs.splice(${i},1); renderSpecsList()" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+                </div>
+            `).join('');
+        }
+
+        function addInstruction() {
+            const text = document.getElementById('instructionText').value.trim();
+            if (!text) { showToast('الرجاء إدخال تعليمة', 'error'); return; }
+            tempInstructions.push(text);
+            renderInstructionsList();
+            document.getElementById('instructionText').value = '';
+        }
+
+        function renderInstructionsList() {
+            const container = document.getElementById('instructionsList');
+            container.innerHTML = tempInstructions.map((inst, i) => `
+                <div class="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
+                    <span><i class="fas fa-check-circle text-gold ml-2"></i>${inst}</span>
+                    <button type="button" onclick="tempInstructions.splice(${i},1); renderInstructionsList()" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+                </div>
+            `).join('');
+        }
+
+        // حفظ المنتج
+        function saveProduct(e) {
+            e.preventDefault();
+            const id = document.getElementById('productId').value;
+            const productData = {
+                id: id ? parseInt(id) : Date.now(),
+                name: document.getElementById('productName').value,
+                category: document.getElementById('productCategory').value,
+                price: parseFloat(document.getElementById('productPrice').value),
+                installmentPrice: parseFloat(document.getElementById('productInstallment').value) || null,
+                image: document.getElementById('productImage').value || 'https://via.placeholder.com/400x300?text=صورة+المنتج',
+                description: document.getElementById('productDescription').value,
+                specs: tempSpecs,
+                instructions: tempInstructions
+            };
+
+            if (id) {
+                const index = products.findIndex(p => p.id === parseInt(id));
+                if (index !== -1) products[index] = productData;
+            } else {
+                products.push(productData);
+            }
+
+            saveData();
+            renderProducts();
+            closeProductManager();
+            showToast('تم حفظ المنتج بنجاح');
+        }
+
+        function editProduct(productId) {
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+
+            document.getElementById('productId').value = product.id;
+            document.getElementById('productName').value = product.name;
+            document.getElementById('productCategory').value = product.category;
+            document.getElementById('productPrice').value = product.price;
+            document.getElementById('productInstallment').value = product.installmentPrice || '';
+            document.getElementById('productImage').value = product.image;
+            document.getElementById('productDescription').value = product.description;
+            
+            tempSpecs = [...(product.specs || [])];
+            tempInstructions = [...(product.instructions || [])];
+            renderSpecsList();
+            renderInstructionsList();
+
+            document.getElementById('managerTitle').innerHTML = '<i class="fas fa-edit ml-2 text-gold"></i>تعديل المنتج';
+            document.getElementById('productManagerModal').classList.add('active');
+        }
+
+        function deleteProduct(productId) {
+            if (confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
+                products = products.filter(p => p.id !== productId);
+                saveData();
+                renderProducts();
+                showToast('تم حذف المنتج');
+            }
+        }
+
+        // عرض المنتج (مع المواصفات والتعليمات)
+        function viewProduct(productId) {
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+            const category = categories.find(c => c.id === product.category);
+            
+            document.getElementById('productViewContent').innerHTML = `
+                <div class="grid md:grid-cols-2 gap-6 p-6">
+                    <div class="bg-gray-100 rounded-xl overflow-hidden">
+                        <img src="${product.image}" class="w-full h-96 object-cover">
+                    </div>
+                    <div>
+                        <span class="gold-gradient text-primaryDark text-sm px-3 py-1 rounded-full mb-3 inline-block font-bold">
+                            <i class="fas ${category?.icon} ml-1"></i>${category?.name}
+                        </span>
+                        <h2 class="text-3xl font-bold text-primary mb-4">${product.name}</h2>
+                        <div class="text-3xl font-bold text-goldDark mb-4">${product.price} ريال</div>
+                        <p class="text-gray-600 mb-6 leading-relaxed">${product.description}</p>
+                        
+                        ${product.specs && product.specs.length ? `
+                            <div class="mb-6">
+                                <h3 class="font-bold text-lg mb-3 text-primary"><i class="fas fa-list ml-2 text-gold"></i>المواصفات</h3>
+                                <div class="grid grid-cols-2 gap-2">
+                                    ${product.specs.map(spec => `
+                                        <div class="specs-item p-3 rounded-lg bg-gray-50">
+                                            <div class="text-xs text-gray-500">${spec.key}</div>
+                                            <div class="font-bold text-primary">${spec.value}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${product.instructions && product.instructions.length ? `
+                            <div class="mb-6">
+                                <h3 class="font-bold text-lg mb-3 text-primary"><i class="fas fa-clipboard-list ml-2 text-gold"></i>تعليمات الاستخدام</h3>
+                                <ul class="space-y-2">
+                                    ${product.instructions.map(inst => `
+                                        <li class="flex items-start gap-2">
+                                            <i class="fas fa-check-circle text-gold mt-1"></i>
+                                            <span class="text-gray-700">${inst}</span>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="flex gap-3">
+                            <button onclick="addToCart(${product.id}); closeProductView();" class="flex-1 gold-gradient text-primaryDark py-3 rounded-xl font-bold transition">
+                                <i class="fas fa-cart-plus ml-2"></i>أضف للسلة
+                            </button>
+                            <a href="https://wa.me/966504330032?text=استفسار عن: ${encodeURIComponent(product.name)}" target="_blank" class="px-6 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition">
+                                <i class="fab fa-whatsapp"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('productViewModal').classList.add('active');
+        }
+
+        function closeProductView() { document.getElementById('productViewModal').classList.remove('active'); }
+        function closeProductManager() { document.getElementById('productManagerModal').classList.remove('active'); tempSpecs = []; tempInstructions = []; }
+
+        // إدارة الأقسام
+        function openCategoryManager() {
+            renderCategoriesList();
+            document.getElementById('categoryManagerModal').classList.add('active');
+        }
+
+        function closeCategoryManager() { document.getElementById('categoryManagerModal').classList.remove('active'); }
+
+        function renderCategoriesList() {
+            const container = document.getElementById('categoriesList');
+            container.innerHTML = categories.map(cat => `
+                <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                    <div class="flex items-center gap-2">
+                        <i class="fas ${cat.icon} text-gold"></i>
+                        <span class="font-bold text-primary">${cat.name}</span>
+                        <span class="text-xs text-gray-500">(${products.filter(p => p.category === cat.id).length} منتج)</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="editCategory('${cat.id}')" class="text-goldDark hover:text-gold"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteCategory('${cat.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function addNewCategory() {
+            const name = document.getElementById('newCategoryName').value.trim();
+            if (!name) { showToast('الرجاء إدخال اسم القسم', 'error'); return; }
+            const id = name.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '_' + Date.now();
+            categories.push({ id, name, icon: 'fa-folder' });
+            saveData();
+            renderCategories();
+            renderCategoriesList();
+            document.getElementById('newCategoryName').value = '';
+            showToast('تم إضافة القسم بنجاح');
+        }
+
+        function editCategory(catId) {
+            const cat = categories.find(c => c.id === catId);
+            const newName = prompt('أدخل الاسم الجديد للقسم', cat.name);
+            if (newName && newName.trim()) {
+                cat.name = newName.trim();
+                saveData();
+                renderCategories();
+                renderCategoriesList();
+                showToast('تم تحديث القسم');
+            }
+        }
+
+        function deleteCategory(catId) {
+            if (products.some(p => p.category === catId)) {
+                showToast('لا يمكن حذف القسم لأنه يحتوي على منتجات', 'error');
+                return;
+            }
+            if (confirm('هل أنت متأكد من حذف هذا القسم؟')) {
+                categories = categories.filter(c => c.id !== catId);
+                saveData();
+                renderCategories();
+                renderCategoriesList();
+                if (currentCategory === catId) filterProducts('all');
+                showToast('تم حذف القسم');
+            }
+        }
+
+        // السلة والطلبات
+        function addToCart(id) {
+            const product = products.find(p => p.id === id);
+            const existing = cart.find(i => i.id === id);
+            if (existing) existing.quantity++;
+            else cart.push({ ...product, quantity: 1 });
+            saveCart();
+            updateCartCount();
+            showToast('تم إضافة المنتج للسلة');
+        }
+
+        function updateCartCount() {
+            const count = cart.reduce((s, i) => s + i.quantity, 0);
+            const badge = document.getElementById('cartCount');
+            if (count > 0) { badge.textContent = count; badge.classList.remove('hidden'); badge.classList.add('flex'); }
+            else badge.classList.add('hidden');
+        }
+
+        function openCart() {
+            const total = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
+            document.getElementById('cartModal').innerHTML = `
+                <div class="bg-white rounded-2xl w-full max-w-2xl">
+                    <div class="p-6 border-b border-gold flex justify-between">
+                        <h2 class="text-2xl font-bold text-primary"><i class="fas fa-shopping-cart ml-2 text-gold"></i>سلة التسوق</h2>
+                        <button onclick="closeCart()" class="text-2xl">&times;</button>
+                    </div>
+                    <div id="cartContent" class="p-6">${cart.length ? cart.map(i => `
+                        <div class="flex justify-between border-b py-3">
+                            <div><b class="text-primary">${i.name}</b><div class="text-sm text-gray-500">${i.price} ريال × ${i.quantity}</div></div>
+                            <div><button onclick="updateQty(${i.id},-1)" class="bg-gray-200 px-2 rounded">-</button> <span class="mx-2">${i.quantity}</span> <button onclick="updateQty(${i.id},1)" class="bg-gray-200 px-2 rounded">+</button> <button onclick="removeFromCart(${i.id})" class="text-red-500 ml-3"><i class="fas fa-trash"></i></button></div>
+                        </div>`).join('') + `<div class="mt-4 pt-4 border-t"><div class="flex justify-between font-bold text-lg"><span>الإجمالي:</span><span class="text-goldDark">${total} ريال</span></div><button onclick="checkout()" class="w-full mt-4 gold-gradient text-primaryDark py-3 rounded-xl font-bold"><i class="fab fa-whatsapp ml-2"></i>إتمام الطلب</button></div>` : '<div class="text-center py-8 text-gray-500">السلة فارغة</div>'}</div>
+                </div>`;
+            document.getElementById('cartModal').classList.add('active');
+        }
+
+        function closeCart() { document.getElementById('cartModal').classList.remove('active'); }
+        function updateQty(id, c) { const i = cart.find(i => i.id === id); if (i) { i.quantity += c; if (i.quantity <= 0) cart = cart.filter(x => x.id !== id); saveCart(); updateCartCount(); openCart(); } }
+        function removeFromCart(id) { cart = cart.filter(i => i.id !== id); saveCart(); updateCartCount(); openCart(); }
+        
+        function checkout() {
+            if (!currentUser) { showToast('الرجاء تسجيل الدخول أولاً', 'error'); showLoginModal(); return; }
+            const total = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
+            orders.push({ id: Date.now(), customerId: currentUser.id, customerName: currentUser.fullName, total, items: [...cart], date: new Date().toLocaleString('ar-SA') });
+            saveData();
+            let msg = `🛒 طلب جديد من تتبع للأنظمة الأمنية:\n\nالعميل: ${currentUser.fullName}\n`;
+            cart.forEach(i => msg += `• ${i.name} (${i.quantity} × ${i.price} ريال)\n`);
+            msg += `\n💰 الإجمالي: ${total} ريال`;
+            window.open(`https://wa.me/966504330032?text=${encodeURIComponent(msg)}`, '_blank');
+            cart = []; saveCart(); updateCartCount(); closeCart(); showToast('تم إرسال الطلب بنجاح');
+        }
+
+        // وظائف إضافية مبسطة
+        function showLoginModal() { alert("استخدم حساب تجريبي: username: test / password: 123"); }
+        function showRegisterModal() { alert("سيتم إضافة حساب جديد قريباً"); }
+        function showAdminDashboard() { alert("لوحة المدير - يمكنك مشاهدة الإحصائيات قريباً"); }
+        function showToast(msg, type = 'success') { const t = document.createElement('div'); t.className = `toast bg-${type === 'success' ? 'green' : 'red'}-500 text-white px-6 py-3 rounded-xl shadow-lg`; t.innerHTML = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3000); }
+
+        // تهيئة الصفحة
+        loadData();
+        renderCategories();
+        renderProducts();
+        updateCartCount();
+    </script>
+</body>
+</html>
